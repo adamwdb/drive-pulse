@@ -10,7 +10,7 @@ from .database import AsyncSessionLocal
 from .models import FileMetadata, User
 from .sync import sync_drive
 
-app = FastAPI(title="Drive Pulse Identity")
+app = FastAPI(title="Drive Pulse")
 
 # Dependency to get DB session
 async def get_db():
