@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en" id="html-root">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drive Pulse | Security & Health</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        pulse: {
+                            primary: '#6366f1', // Electric Indigo
+                            secondary: '#a855f7', // Purple
+                            accent: '#22d3ee', // Cyan
+                            danger: '#f43f5e', // Rose
+                            bgLight: '#fcfcff'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .v-enter-active, .v-leave-active { transition: all 0.4s ease; }
+        .v-enter-from, .v-leave-to { opacity: 0; transform: translateY(10px); }
+        
+        .pulse-glow {
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 70%);
+            filter: blur(60px);
+            z-index: -1;
+        }
+        
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(99, 102, 241, 0.1);
+        }
+        .dark .glass {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(99, 102, 241, 0.15);
+        }
+        
+        /* Consistent Typography */
+        h1, h2, h3, p, span, td, th {
+            font-weight: 400;
+            text-shadow: none !important;
+        }
+        .font-bold, .font-semibold {
+            font-weight: 600;
+        }
+        .font-black {
+            font-weight: 800;
+        }
+        
+        .dark h1, .dark h2, .dark h3, .dark p, .dark span, .dark td, .dark th {
+            text-shadow: none !important;
+        }
+        
+        .identity-gradient {
+            background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+        }
+        
+        .progress-circle { transition: stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1); }
+        
+        body { 
+            transition: background-color 0.5s ease; 
+            height: 100vh;
+            overflow: hidden;
+        }
+        main {
+            height: calc(100vh - 180px); /* Adjust based on header height */
+            overflow-y: auto;
+            scrollbar-width: none; /* Firefox */
+        }
+        main::-webkit-scrollbar { display: none; } /* Safari/Chrome */
+        [v-cloak] { display: none; }
+    </style>
+</head>
+<body class="bg-pulse-bgLight dark:bg-[#020617] text-slate-900 dark:text-slate-100 font-sans">
+    
+    <!-- Background Identity Elements -->
+    <div class="pulse-glow top-[-100px] left-[-100px]"></div>
+    <div class="pulse-glow bottom-[-100px] right-[-100px]" style="background: radial-gradient(circle, rgba(168, 85, 247, 0.08) 0%, transparent 70%);"></div>
+
+    <div id="app" v-cloak></div>
+    
+    <script src="app.js"></script>
+</body>
+</html>

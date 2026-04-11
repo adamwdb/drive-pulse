@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.class
+.venv/
+env/
+venv/
+ENV/
+
+# Drive Pulse Local Data (SENSITIVE)
+drive_health.db
+token.json
+credentials.json
+
+# Internal Tooling
+.superpowers/
+.todos.md
+
+# OS
+.DS_Store
+Thumbs.db
