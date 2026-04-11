@@ -2,7 +2,6 @@ import anyio
 import logging
 from datetime import datetime
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 from .database import AsyncSessionLocal, init_db
 from .models import FileMetadata, User
 from .drive_client import get_drive_service
