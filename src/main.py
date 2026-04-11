@@ -1,11 +1,12 @@
 from fastapi import FastAPI, Depends, Query, HTTPException
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
-from typing import List, Optional
+from typing import Optional
 from datetime import datetime, timedelta
 
-from .database import AsyncSessionLocal, init_db
+from .database import AsyncSessionLocal
 from .models import FileMetadata, User
 from .sync import sync_drive
 
@@ -24,11 +25,10 @@ async def get_my_email(db: AsyncSession):
     result = await db.execute(select(User.email).where(User.is_primary == 1))
     return result.scalar()
 
-from fastapi.responses import FileResponse
-
 @app.get("/audit")
 async def get_audit_page():
     return FileResponse("static/audit.html")
+
 
 @app.get("/stats")
 async def get_stats(
@@ -228,14 +228,14 @@ async def list_files(
             query = query.where(FileMetadata.sharing_level == "Public", FileMetadata.public_role != "writer")
         elif severity == "Medium":
             # NOT Public, but has external shares
-            query = query.where(FileMetadata.sharing_level != "Public", FileMetadata.external_shares != None, FileMetadata.external_shares != "[]")
+            query = query.where(FileMetadata.sharing_level != "Public", FileMetadata.external_shares.isnot(None), FileMetadata.external_shares != "[]")
         elif severity == "Low":
             # NOT Public, NOT External, but is Shared AND Old
             query = query.where(
                 FileMetadata.sharing_level != "Public",
                 FileMetadata.sharing_level != "Private",
                 FileMetadata.modified_at < six_months_ago,
-                or_(FileMetadata.external_shares == None, FileMetadata.external_shares == "[]")
+                or_(FileMetadata.external_shares.is_(None), FileMetadata.external_shares == "[]")
             )
         elif severity == "Safe":
             query = query.where(FileMetadata.sharing_level == "Private")
