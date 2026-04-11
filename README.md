@@ -1,4 +1,4 @@
-# ⚡ Drive Pulse Identity
+# ⚡ Drive Pulse
 
 **Drive Pulse** is a professional-grade, local security audit and health dashboard for your Google Drive. It allows you to analyze hundreds of thousands of files in seconds, identifying security risks, public exposures, and orphaned assets—all while keeping your metadata private on your own machine.
 
