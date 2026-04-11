@@ -1,6 +1,7 @@
 import anyio
 import logging
 from datetime import datetime
+from sqlalchemy import select
 from .database import AsyncSessionLocal, init_db
 from .models import FileMetadata, User
 from .drive_client import get_drive_service
@@ -41,14 +42,12 @@ async def sync_drive(user_only: bool = False):
         raise
 
     # 1. Build a map of all folders for path resolution
-    # We fetch folders first so we can build human-readable paths
     folders = {}
     page_token = None
 
     logger.info("Fetching folders...")
     try:
         while True:
-            # Fetch folders using anyio to run the blocking google-api call in a thread
             response = await anyio.to_thread.run_sync(
                 lambda: service.files().list(
                     q="mimeType = 'application/vnd.google-apps.folder' and trashed = false",
@@ -61,7 +60,7 @@ async def sync_drive(user_only: bool = False):
             for f in response.get('files', []):
                 folders[f['id']] = {
                     'name': f['name'],
-                    'parent': f.get('parents', [None])[0]
+                    'parent': f.get('parents', [None])[0] if f.get('parents') else None
                 }
 
             page_token = response.get('nextPageToken')
@@ -76,10 +75,8 @@ async def sync_drive(user_only: bool = False):
         """Recursively builds the path string for a folder ID."""
         if not folder_id or folder_id not in folders:
             return ""
-
         path = folders[folder_id]['name']
         parent_id = folders[folder_id]['parent']
-
         if parent_id and parent_id in folders:
             parent_path = resolve_path(parent_id)
             if parent_path:
@@ -104,12 +101,10 @@ async def sync_drive(user_only: bool = False):
 
                 for f in response.get('files', []):
                     files_count += 1
-                    # Extract owner email and domain
                     owners = f.get('owners', [])
                     owner_email = owners[0].get('emailAddress') if owners else None
                     primary_domain = owner_email.split('@')[-1] if owner_email else None
 
-                    # Determine sharing level and external shares
                     sharing_level = "Private"
                     public_role = None
                     external_shares = []
@@ -119,7 +114,6 @@ async def sync_drive(user_only: bool = False):
                         ptype = p.get('type')
                         email = p.get('emailAddress')
                         role = p.get('role')
-
                         if ptype == 'anyone':
                             sharing_level = "Public"
                             public_role = role
@@ -127,32 +121,28 @@ async def sync_drive(user_only: bool = False):
                             if sharing_level != "Public":
                                 sharing_level = "Domain"
                         elif ptype in ('user', 'group'):
-                            # Owners are always part of permissions but don't count as 'shares'
                             if role == 'owner':
                                 continue
-
                             if sharing_level not in ("Public", "Domain"):
                                 sharing_level = "Specific People"
-
-                            # Check for external shares (users outside the owner's domain)
                             if email and primary_domain and not email.endswith(f"@{primary_domain}"):
                                 external_shares.append(email)
 
-                    # Resolve path
                     parents = f.get('parents', [])
                     if not parents:
                         folder_path = "UNORGANIZED"
                     else:
-                        parent_id = parents[0]
-                        folder_path = resolve_path(parent_id)
+                        folder_path = resolve_path(parents[0])
 
-                    # Parse modification time
                     modified_at = None
                     if f.get('modifiedTime'):
-                        # Convert '2024-01-01T00:00:00.000Z' to datetime
                         modified_at = datetime.fromisoformat(f['modifiedTime'].replace('Z', '+00:00'))
 
-                    # Create or Update record
+                    # Check for existing local state to preserve Acknowledgment
+                    stmt = select(FileMetadata.is_acknowledged).where(FileMetadata.id == f['id'])
+                    existing_res = await session.execute(stmt)
+                    existing_ack = existing_res.scalar() or False
+
                     file_record = FileMetadata(
                         id=f['id'],
                         name=f['name'],
@@ -163,10 +153,9 @@ async def sync_drive(user_only: bool = False):
                         public_role=public_role,
                         folder_path=folder_path,
                         modified_at=modified_at,
-                        external_shares=external_shares
+                        external_shares=external_shares,
+                        is_acknowledged=existing_ack
                     )
-
-                    # merge() handles UPSERT-like behavior (update if exists, else insert)
                     await session.merge(file_record)
 
                 page_token = response.get('nextPageToken')
