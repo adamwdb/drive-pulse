@@ -46,11 +46,38 @@
     <div id="app" v-cloak class="max-w-7xl mx-auto p-6 h-full">
         <!-- Header -->
         <header class="flex justify-between items-center mb-8">
-            <div class="flex items-center gap-4 cursor-pointer" @click="window.location.href='/'">
-                <div class="w-10 h-10 identity-gradient rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+            <div class="flex items-center gap-6">
+                <div class="flex items-center gap-3 cursor-pointer" @click="window.location.href='/'">
+                    <div class="w-10 h-10 identity-gradient rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                    </div>
+                    <h1 class="text-xl font-black uppercase tracking-tight">Audit Explorer</h1>
                 </div>
-                <h1 class="text-xl font-black uppercase tracking-tight">Audit Explorer</h1>
+
+                <div class="relative profile-trigger">
+                    <button @click="isProfileOpen = !isProfileOpen" class="flex items-center gap-2 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 p-1.5 rounded-lg transition-colors border border-transparent" :class="{'border-indigo-100 dark:border-indigo-900/30 bg-white/50 dark:bg-slate-900/50': isProfileOpen}">
+                        <div v-if="activeEmail" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                        <p class="text-slate-400 text-[9px] uppercase font-black tracking-widest">Session</p>
+                        <svg v-if="activeEmail" class="w-3 h-3 text-slate-400 transition-transform" :class="{'rotate-180': isProfileOpen}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    
+                    <!-- Dropdown -->
+                    <div v-if="isProfileOpen" class="absolute top-full left-0 mt-2 w-64 glass rounded-2xl shadow-2xl border border-indigo-100 dark:border-indigo-900/30 p-4 z-50 animate__animated animate__fadeInUp animate__faster">
+                        <div class="flex items-center gap-3 mb-3 text-left">
+                            <div class="w-8 h-8 identity-gradient rounded-lg flex items-center justify-center text-white font-black text-xs uppercase">
+                                {{ activeEmail ? activeEmail[0] : '?' }}
+                            </div>
+                            <div class="overflow-hidden">
+                                <p class="text-[8px] font-black uppercase text-indigo-500 tracking-widest">Signed in as</p>
+                                <p class="text-[11px] font-bold text-slate-700 dark:text-slate-200 truncate">{{ activeEmail }}</p>
+                            </div>
+                        </div>
+                        <div class="h-px bg-slate-100 dark:bg-slate-800 my-2"></div>
+                        <p class="text-[8px] text-slate-400 leading-relaxed uppercase font-black tracking-tighter">
+                            Metadata is stored locally. Your session is private.
+                        </p>
+                    </div>
+                </div>
             </div>
 
             <!-- Filters -->
@@ -73,6 +100,22 @@
                 </div>
             </div>
         </header>
+
+        <!-- Error Message -->
+        <div v-if="error" class="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-center justify-between animate__animated animate__shakeX relative z-30">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-rose-500 flex items-center justify-center text-white shadow-lg shadow-rose-500/20">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                </div>
+                <div>
+                    <p class="text-[10px] font-black uppercase text-rose-500 tracking-widest mb-0.5">System Error</p>
+                    <p class="text-sm font-bold text-slate-700 dark:text-slate-200">{{ error }}</p>
+                </div>
+            </div>
+            <button @click="error = null" class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+        </div>
 
         <main class="glass rounded-[2.5rem] overflow-hidden border border-slate-200/50 dark:border-slate-800/50 shadow-2xl relative">
             <!-- Table -->
@@ -113,11 +156,19 @@
                             </td>
                             <td class="px-8 py-4 text-right">
                                 <div class="flex items-center justify-end gap-3">
-                                    <button v-if="file.owner_email === 'adamwbagaskarta@gmail.com'"
+                                    <button v-if="file.owner_email === activeEmail"
                                             @click="acknowledgeFile(file.id)" 
-                                            :class="file.is_acknowledged ? 'text-emerald-600 bg-emerald-500/20 border-emerald-500/30' : 'text-slate-300 hover:text-emerald-500 border-transparent'" 
-                                            class="p-1.5 rounded-lg transition-all border shadow-sm" title="Acknowledge & Mark as Safe">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                                            :disabled="acknowledgingId === file.id"
+                                            :class="file.is_acknowledged ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20 shadow-sm' : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-500/10 border-transparent'" 
+                                            class="p-1.5 rounded-lg transition-all border disabled:opacity-50" :title="file.is_acknowledged ? 'Marked as Safe' : 'Review & Mark Safe'">
+                                        <svg v-if="acknowledgingId === file.id" class="animate-spin h-4 w-4 text-emerald-500" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <template v-else>
+                                            <svg v-if="file.is_acknowledged" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
+                                            <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                                        </template>
                                     </button>
                                     <button @click="openInDrive(file.id)" class="text-indigo-500 font-black uppercase text-[10px] hover:underline">Manage</button>
                                 </div>
@@ -160,10 +211,15 @@
                 const severity = ref(null);
                 const owner = ref('me');
                 const loading = ref(false);
+                const error = ref(null);
+                const activeEmail = ref(null);
+                const isProfileOpen = ref(false);
+                const acknowledgingId = ref(null);
                 let searchTimeout = null;
 
                 const fetchData = async () => {
                     loading.value = true;
+                    error.value = null;
                     try {
                         const params = new URLSearchParams({
                             page: page.value,
@@ -173,11 +229,26 @@
                         if (severity.value) params.append('severity', severity.value);
                         
                         const res = await fetch(`/files?${params.toString()}`);
+                        if (!res.ok) {
+                            const data = await res.json();
+                            throw new Error(data.detail || 'Failed to fetch files');
+                        }
                         const data = await res.json();
                         files.value = data.files;
                         total.value = data.total;
                         pages.value = data.pages;
-                    } catch (err) { console.error(err); }
+
+                        // Fetch active email if not already set
+                        if (!activeEmail.value) {
+                            const sRes = await fetch('/stats?owner=me');
+                            if (!sRes.ok) throw new Error('Failed to fetch session info');
+                            const sData = await sRes.json();
+                            activeEmail.value = sData.my_email;
+                        }
+                    } catch (err) { 
+                        console.error(err); 
+                        error.value = err.message;
+                    }
                     finally { loading.value = false; }
                 };
 
@@ -219,20 +290,41 @@
                 const openInDrive = (id) => window.open(`https://drive.google.com/open?id=${id}`, '_blank');
                 const formatNumber = (num) => (num || 0).toLocaleString();
 
+                const handleOutsideClick = (e) => {
+                    if (isProfileOpen.value && !e.target.closest('.profile-trigger')) {
+                        isProfileOpen.value = false;
+                    }
+                };
+
                 const acknowledgeFile = async (id) => {
+                    acknowledgingId.value = id;
+                    error.value = null;
                     try {
                         const res = await fetch(`/files/${id}/acknowledge`, { method: 'POST' });
+                        if (!res.ok) {
+                            const data = await res.json();
+                            throw new Error(data.detail || 'Failed to acknowledge file');
+                        }
                         const data = await res.json();
                         // Update local state for immediate feedback
                         const file = files.value.find(f => f.id === id);
                         if (file) file.is_acknowledged = data.is_acknowledged;
-                    } catch (err) { console.error(err); }
+                    } catch (err) { 
+                        console.error(err); 
+                        error.value = err.message;
+                    }
+                    finally { acknowledgingId.value = null; }
                 };
 
-                onMounted(fetchData);
+                onMounted(() => {
+                    fetchData();
+                    window.addEventListener('click', handleOutsideClick);
+                });
+
                 watch([page, severity, owner], fetchData);
 
-                return { files, total, page, pages, search, severity, owner, loading, debounceSearch, getSeverityColor, getSharingLabel, getBadgeClass, formatDate, openInDrive, formatNumber, acknowledgeFile };
+
+                return { files, total, page, pages, search, severity, owner, loading, error, activeEmail, isProfileOpen, acknowledgingId, debounceSearch, getSeverityColor, getSharingLabel, getBadgeClass, formatDate, openInDrive, formatNumber, acknowledgeFile };
             }
         }).mount('#app');
     </script>
