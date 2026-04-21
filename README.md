@@ -66,9 +66,22 @@ Once started, visit **http://localhost:8000** in your browser.
 1. **Initial Sync:** Click the **Sync Now** button. A browser tab will open for Google Authentication. Once granted, the app will begin crawling your metadata (only metadata is fetched; your file contents are never downloaded).
 2. **Dashboard Review:** Check your **Pulse Health Score**. If it's low, review the **Security Audit Log** below.
 3. **Acknowledgment:** 
-   - You can mark files you own as safe by clicking the **Shield (🛡️+✅)** icon.
+   - You can mark files you own as safe by clicking the **Review (📋+✓)** icon.
+   - Once marked safe, the file will be hidden from your main Health Dashboard to help you focus on remaining risks.
+   - You can view and "un-acknowledge" files anytime in the **Audit Explorer**.
    - *Note:* Acknowledgment only works for **My Drive** files because you have direct control over their permissions. Shared files are informational only.
 4. **Detailed Search:** Click **View Full Explorer** to search through your entire file list and filter by specific risk levels.
+
+---
+
+## ❓ Troubleshooting
+
+### Token Expired or Authentication Error
+If you see a "System Error" or authentication failure:
+1. Stop the app (Ctrl+C).
+2. Delete the `token.json` file in the project root.
+3. Restart the app and click **Sync**. This will trigger a fresh Google login.
+*Tip: If your token expires every 7 days, go to your Google Cloud Console and set your App Status to "In Production" instead of "Testing".*
 
 ---
 

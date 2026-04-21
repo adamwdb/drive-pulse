@@ -13,6 +13,8 @@ createApp({
         const displayScore = ref(0);
         const sharedDisplayScore = ref(0);
         const activeEmail = ref(null);
+        const isProfileOpen = ref(false);
+        const acknowledgingId = ref(null);
         
         const displayStats = ref({
             asset_count: 0,
@@ -48,11 +50,19 @@ createApp({
         const fetchData = async () => {
             if (loading.value) return;
             loading.value = true;
+            error.value = null;
             try {
                 const [sRes, hRes] = await Promise.all([
                     fetch(`/stats?owner=${filter.value}`),
                     fetch(`/health?owner=${filter.value}`)
                 ]);
+                
+                if (!sRes.ok || !hRes.ok) {
+                    const sErr = await sRes.json();
+                    const hErr = await hRes.json();
+                    throw new Error(sErr.detail || hErr.detail || 'Failed to fetch pulse data');
+                }
+
                 const sData = await sRes.json();
                 const hData = await hRes.json();
                 
@@ -69,6 +79,7 @@ createApp({
                 animateStats(sData);
             } catch (err) {
                 console.error(err);
+                error.value = err.message;
             } finally {
                 loading.value = false;
             }
@@ -106,9 +117,17 @@ createApp({
 
         const syncData = async () => {
             isSyncing.value = true;
+            error.value = null;
             try {
-                await fetch('/sync', { method: 'POST' });
+                const res = await fetch('/sync', { method: 'POST' });
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.detail || 'Sync failed');
+                }
                 await fetchData();
+            } catch (err) {
+                console.error(err);
+                error.value = err.message;
             } finally {
                 isSyncing.value = false;
             }
@@ -117,11 +136,20 @@ createApp({
         const openInDrive = (id) => window.open(`https://drive.google.com/open?id=${id}`, '_blank');
         
         const acknowledgeFile = async (id) => {
+            acknowledgingId.value = id;
+            error.value = null;
             try {
-                await fetch(`/files/${id}/acknowledge`, { method: 'POST' });
+                const res = await fetch(`/files/${id}/acknowledge`, { method: 'POST' });
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.detail || 'Failed to acknowledge file');
+                }
                 await fetchData(); // Refresh health score and list
             } catch (err) {
                 console.error(err);
+                error.value = err.message;
+            } finally {
+                acknowledgingId.value = null;
             }
         };
 
@@ -132,10 +160,20 @@ createApp({
             return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + ['B', 'KB', 'MB', 'GB', 'TB'][i];
         };
 
-        onMounted(fetchData);
+        const handleOutsideClick = (e) => {
+            if (isProfileOpen.value && !e.target.closest('.profile-trigger')) {
+                isProfileOpen.value = false;
+            }
+        };
+
+        onMounted(() => {
+            fetchData();
+            window.addEventListener('click', handleOutsideClick);
+        });
+
         watch(filter, fetchData);
 
-        return { stats, health, loading, isSyncing, isDark, filter, currentTab, displayScore, sharedDisplayScore, displayStats, storagePulse, activeEmail, fetchData, toggleTheme, syncData, openInDrive, acknowledgeFile, formatNumber, formatBytes };
+        return { stats, health, loading, error, isSyncing, isDark, filter, currentTab, displayScore, sharedDisplayScore, displayStats, storagePulse, activeEmail, isProfileOpen, acknowledgingId, fetchData, toggleTheme, syncData, openInDrive, acknowledgeFile, formatNumber, formatBytes };
     },
     template: `
         <div class="max-w-5xl mx-auto p-8 relative z-10">
@@ -147,11 +185,31 @@ createApp({
                     </div>
                     <div>
                         <h1 class="text-3xl font-black tracking-tight text-slate-800 dark:text-white uppercase">Drive Pulse</h1>
-                        <div class="flex items-center gap-2">
-                            <span v-if="activeEmail" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                            <p class="text-slate-400 text-[10px] uppercase font-black tracking-widest">
-                                {{ activeEmail ? 'Active Session: ' + activeEmail : 'Local Security Audit' }}
-                            </p>
+                        <div class="relative profile-trigger">
+                            <button @click="isProfileOpen = !isProfileOpen" class="flex items-center gap-2 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 p-1 rounded-lg transition-colors -ml-1">
+                                <span v-if="activeEmail" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <p class="text-slate-400 text-[10px] uppercase font-black tracking-widest">
+                                    {{ activeEmail ? 'Active Session' : 'Local Security Audit' }}
+                                </p>
+                                <svg v-if="activeEmail" class="w-3 h-3 text-slate-400 transition-transform" :class="{'rotate-180': isProfileOpen}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" /></svg>
+                            </button>
+                            
+                            <!-- Dropdown -->
+                            <div v-if="isProfileOpen" class="absolute top-full left-0 mt-2 w-64 glass rounded-2xl shadow-2xl border border-indigo-100 dark:border-indigo-900/30 p-4 z-50 animate__animated animate__fadeInUp animate__faster">
+                                <div class="flex items-center gap-3 mb-3">
+                                    <div class="w-8 h-8 identity-gradient rounded-lg flex items-center justify-center text-white font-black text-xs uppercase">
+                                        {{ activeEmail ? activeEmail[0] : '?' }}
+                                    </div>
+                                    <div class="overflow-hidden text-left">
+                                        <p class="text-[8px] font-black uppercase text-indigo-500 tracking-widest">Signed in as</p>
+                                        <p class="text-[11px] font-bold text-slate-700 dark:text-slate-200 truncate">{{ activeEmail }}</p>
+                                    </div>
+                                </div>
+                                <div class="h-px bg-slate-100 dark:bg-slate-800 my-2"></div>
+                                <p class="text-[8px] text-slate-400 leading-relaxed uppercase font-black tracking-tighter">
+                                    Local security audit: Your data stays private on your machine.
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -169,13 +227,33 @@ createApp({
                     <button @click="toggleTheme" class="p-2 text-xl hover:scale-110 transition-transform">
                         <span v-if="!isDark">🌙</span><span v-else>☀️</span>
                     </button>
-                    <button @click="syncData" :disabled="isSyncing" class="ml-2 identity-gradient text-white px-6 py-2 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg active:scale-95 disabled:opacity-50">
+                    <button @click="syncData" :disabled="isSyncing" class="ml-2 identity-gradient text-white px-6 py-2 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg active:scale-95 disabled:opacity-50 flex items-center gap-2">
+                        <svg v-if="isSyncing" class="animate-spin h-3 w-3 text-white" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
                         {{ isSyncing ? 'Syncing...' : 'Sync' }}
                     </button>
                 </div>
             </header>
 
             <main>
+                <!-- Error Message -->
+                <div v-if="error" class="mb-8 p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-center justify-between animate__animated animate__shakeX">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-rose-500 flex items-center justify-center text-white shadow-lg shadow-rose-500/20">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-black uppercase text-rose-500 tracking-widest mb-0.5">System Error</p>
+                            <p class="text-sm font-bold text-slate-700 dark:text-slate-200">{{ error }}</p>
+                        </div>
+                    </div>
+                    <button @click="error = null" class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+
                 <div v-if="loading && !health" class="flex flex-col items-center justify-center py-32 animate-pulse">
                     <div class="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-4"></div>
                     <p class="text-[10px] font-black uppercase tracking-widest text-indigo-500">Scanning Pulse...</p>
@@ -253,8 +331,12 @@ createApp({
                                             <td class="px-8 py-4"><span :class="{'text-rose-600 border-rose-600/30 bg-rose-600/10': item.severity === 'Critical', 'text-rose-400 bg-rose-400/10 border-rose-400/30': item.severity === 'High','text-amber-500 bg-amber-500/10 border-amber-500/20': item.severity === 'Medium'}" class="px-3 py-1 rounded-lg text-[9px] font-black uppercase border">{{ item.severity }}</span></td>
                                             <td class="px-8 py-4 text-right">
                                                 <div class="flex items-center justify-end gap-3">
-                                                    <button v-if="item.is_mine" @click="acknowledgeFile(item.id)" class="text-emerald-500 hover:text-emerald-600 transition-colors" title="Acknowledge & Mark as Safe">
-                                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                                                    <button v-if="item.is_mine" @click="acknowledgeFile(item.id)" :disabled="acknowledgingId === item.id" class="p-1.5 rounded-lg text-slate-400 hover:text-emerald-500 hover:bg-emerald-500/10 transition-all border border-transparent disabled:opacity-50" title="Review & Mark Safe">
+                                                        <svg v-if="acknowledgingId === item.id" class="animate-spin h-4 w-4 text-emerald-500" viewBox="0 0 24 24">
+                                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                        </svg>
+                                                        <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
                                                     </button>
                                                     <button @click="openInDrive(item.id)" class="text-indigo-500 font-black uppercase text-[10px] hover:underline">Manage</button>
                                                 </div>
