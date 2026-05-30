@@ -322,7 +322,10 @@ createApp({
                                                         'bg-amber-400': item.severity === 'Medium',
                                                         'bg-slate-400': item.severity === 'Low'
                                                     }"></div>
-                                                    <span class="text-sm font-bold text-slate-700 dark:text-slate-200 truncate max-w-[250px]">{{ item.name }}</span>
+                                                    <div class="flex flex-col truncate">
+                                                        <span class="text-sm font-bold text-slate-700 dark:text-slate-200 truncate max-w-[250px]">{{ item.name }}</span>
+                                                        <span class="text-[9px] text-slate-400 font-medium truncate">{{ item.owner_email }}</span>
+                                                    </div>
                                                     <span v-if="!item.is_mine" class="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-400 text-[8px] font-black uppercase rounded">Shared</span>
                                                 </div>
                                             </td>

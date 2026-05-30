@@ -123,8 +123,17 @@ async def get_health(
     owned_files = [f for f in files if f.owner_email == my_email]
     total_owned = len(owned_files) or 1
     
-    # Safe = Private OR Acknowledged
-    safe_owned_count = sum(1 for f in owned_files if f.sharing_level == "Private" or f.is_acknowledged)
+    # Safe = Private OR Internal Shared (Specific People/Domain with no external emails) OR Acknowledged
+    def is_file_safe(f):
+        if f.is_acknowledged: return True
+        if f.sharing_level == "Private": return True
+        if f.sharing_level in ("Specific People", "Domain"):
+            # If it's shared with specific people, it's safe unless it's external
+            if not f.external_shares or len(f.external_shares) == 0:
+                return True
+        return False
+
+    safe_owned_count = sum(1 for f in owned_files if is_file_safe(f))
     safety_score_owned = int((safe_owned_count / total_owned) * 100)
 
     # 2. SHARED FILES ANALYSIS (Safe Ratio Model)
@@ -155,19 +164,22 @@ async def get_health(
         }
     }
     
-    # Priority Risk Items (Mix of both, but flag ownership)
+    # Priority Risk Items (Filtered by requested ownership)
     risk_items = []
-    # Mix unacknowledged owned files + all shared files for the log
     all_risks = []
-    # 1. My Critical/High
-    for f in [f for f in owned_unack if f.sharing_level == "Public"]:
-        all_risks.append(f)
-    # 2. Shared Public
-    for f in [f for f in shared_files if f.sharing_level == "Public"]:
-        all_risks.append(f)
-    # 3. My External
-    for f in [f for f in owned_unack if f.external_shares and len(f.external_shares) > 0]:
-        all_risks.append(f)
+    
+    # 1. My Critical/High (Only if owner is 'all' or 'me')
+    if owner in ("all", "me"):
+        for f in [f for f in owned_unack if f.sharing_level == "Public"]:
+            all_risks.append(f)
+        # 3. My External
+        for f in [f for f in owned_unack if f.external_shares and len(f.external_shares) > 0]:
+            all_risks.append(f)
+            
+    # 2. Shared Public (Only if owner is 'all' or 'others')
+    if owner in ("all", "others"):
+        for f in [f for f in shared_files if f.sharing_level == "Public"]:
+            all_risks.append(f)
             
     # Pick top 50
     for f in all_risks[:50]:
@@ -177,12 +189,14 @@ async def get_health(
             risk_items.append({
                 "id": f.id, "name": f.name, "reason": role_desc, 
                 "severity": "Critical" if f.public_role == "writer" else "High", 
-                "mime_type": f.mime_type, "is_mine": is_mine
+                "mime_type": f.mime_type, "is_mine": is_mine,
+                "owner_email": f.owner_email
             })
         elif f.external_shares and len(f.external_shares) > 0:
             risk_items.append({
                 "id": f.id, "name": f.name, "reason": f"Shared externally ({len(f.external_shares)} users)", 
-                "severity": "Medium", "mime_type": f.mime_type, "is_mine": is_mine
+                "severity": "Medium", "mime_type": f.mime_type, "is_mine": is_mine,
+                "owner_email": f.owner_email
             })
 
     return {
