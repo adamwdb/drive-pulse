@@ -125,8 +125,10 @@ async def get_health(
     
     # Safe = Private OR Internal Shared (Specific People/Domain with no external emails) OR Acknowledged
     def is_file_safe(f):
-        if f.is_acknowledged: return True
-        if f.sharing_level == "Private": return True
+        if f.is_acknowledged:
+            return True
+        if f.sharing_level == "Private":
+            return True
         if f.sharing_level in ("Specific People", "Domain"):
             # If it's shared with specific people, it's safe unless it's external
             if not f.external_shares or len(f.external_shares) == 0:

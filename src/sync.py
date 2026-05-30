@@ -85,7 +85,6 @@ async def sync_drive(user_only: bool = False):
 
     # 2. Iterate through all files and folders to sync to DB
     logger.info("Fetching all files metadata...")
-    sync_start_time = datetime.now()
     seen_ids = set()
     try:
         async with AsyncSessionLocal() as session:
