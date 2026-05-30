@@ -85,6 +85,7 @@ async def sync_drive(user_only: bool = False):
 
     # 2. Iterate through all files and folders to sync to DB
     logger.info("Fetching all files metadata...")
+    seen_ids = set()
     try:
         async with AsyncSessionLocal() as session:
             page_token = None
@@ -101,6 +102,9 @@ async def sync_drive(user_only: bool = False):
 
                 for f in response.get('files', []):
                     files_count += 1
+                    file_id = f['id']
+                    seen_ids.add(file_id)
+                    
                     owners = f.get('owners', [])
                     owner_email = owners[0].get('emailAddress') if owners else None
                     primary_domain = owner_email.split('@')[-1] if owner_email else None
@@ -139,12 +143,12 @@ async def sync_drive(user_only: bool = False):
                         modified_at = datetime.fromisoformat(f['modifiedTime'].replace('Z', '+00:00'))
 
                     # Check for existing local state to preserve Acknowledgment
-                    stmt = select(FileMetadata.is_acknowledged).where(FileMetadata.id == f['id'])
+                    stmt = select(FileMetadata.is_acknowledged).where(FileMetadata.id == file_id)
                     existing_res = await session.execute(stmt)
                     existing_ack = existing_res.scalar() or False
 
                     file_record = FileMetadata(
-                        id=f['id'],
+                        id=file_id,
                         name=f['name'],
                         mime_type=f['mimeType'],
                         size_bytes=int(f.get('size', 0)),
@@ -164,6 +168,29 @@ async def sync_drive(user_only: bool = False):
             
             logger.info(f"Syncing {files_count} files to local database...")
             await session.commit()
+
+            # Cleanup: Remove files from DB that were not seen in this sync
+            logger.info("Cleaning up deleted files...")
+            from sqlalchemy import delete
+            
+            # Fetch all IDs in DB
+            db_stmt = select(FileMetadata.id)
+            db_res = await session.execute(db_stmt)
+            db_ids = {row[0] for row in db_res.all()}
+            
+            ids_to_delete = db_ids - seen_ids
+            if ids_to_delete:
+                logger.info(f"Removing {len(ids_to_delete)} ghost files from local database...")
+                # SQLite has a limit on the number of parameters in a query.
+                # If we have many files to delete, we should do it in batches.
+                ids_to_delete_list = list(ids_to_delete)
+                batch_size = 500
+                for i in range(0, len(ids_to_delete_list), batch_size):
+                    batch = ids_to_delete_list[i:i + batch_size]
+                    del_stmt = delete(FileMetadata).where(FileMetadata.id.in_(batch))
+                    await session.execute(del_stmt)
+                await session.commit()
+            
             logger.info("Sync completed successfully.")
     except Exception as e:
         logger.error(f"Error during file sync: {e}")
